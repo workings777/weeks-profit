@@ -119,20 +119,25 @@
 
       <div class="card card--gap">
         <div class="card__title">고정비 / 영업외손익 / 근무시간</div>
-        <div class="grid-3">
+        <div class="grid-4">
           <div class="field">
             <label>고정비 <span class="field__hint">(직접 입력)</span></label>
-            <input type="number" id="g-fixed" value="391" class="input input--highlight">
+            <input type="number" id="g-fixed" value="391" class="input input--highlight" oninput="App.recalc()">
             <span class="field__unit">백만원</span>
           </div>
           <div class="field">
             <label>영업외손익 <span class="field__hint">(음수 가능)</span></label>
-            <input type="number" id="g-other" value="-53" class="input input--highlight">
+            <input type="number" id="g-other" value="-53" class="input input--highlight" oninput="App.recalc()">
             <span class="field__unit">백만원</span>
           </div>
           <div class="field">
-            <label>근무시간</label>
-            <input type="number" id="g-hours" value="2735" class="input">
+            <label>익주 근무시간</label>
+            <input type="number" id="g-hours" value="2735" class="input" oninput="App.recalc()">
+            <span class="field__unit">시간</span>
+          </div>
+          <div class="field">
+            <label>실적 근무시간</label>
+            <input type="number" id="a-hours" value="2735" class="input input--highlight" oninput="App.recalc()">
             <span class="field__unit">시간</span>
           </div>
         </div>
