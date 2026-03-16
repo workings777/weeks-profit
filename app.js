@@ -78,7 +78,11 @@ const App = (() => {
   function getActualData() {
     const sales  = CONFIG.CHANNELS.reduce((s, c) => s + (actualData[c]?.sales || 0), 0) / 1e6;
     const cogs   = CONFIG.CHANNELS.reduce((s, c) => s + (actualData[c]?.cogs  || 0), 0) / 1e6;
-    const varC   = calcTotalVarCost();
+    const varC   = CONFIG.CHANNELS.reduce((s, c) => {
+      const actSales = (actualData[c]?.sales || 0) / 1e6;
+      return s + actSales * (varRates[c]?.commission || 0) / 100
+               + actSales * (varRates[c]?.logistics  || 0) / 100;
+    }, 0);
     const fixed  = gv('g-fixed');
     const other  = gv('g-other');
     const hours  = gv('g-hours');
