@@ -681,6 +681,20 @@ const App = (() => {
     if (fi) fi.addEventListener('change', () => handleFile(fi));
   }
 
+  function saveFixedOther() {
+    const fv = $('g-fixed')?.value;
+    const ov = $('g-other')?.value;
+    if (fv !== undefined) localStorage.setItem('g-fixed', fv);
+    if (ov !== undefined) localStorage.setItem('g-other', ov);
+  }
+
+  function restoreFixedOther() {
+    const fv = localStorage.getItem('g-fixed');
+    const ov = localStorage.getItem('g-other');
+    const fe = $('g-fixed'); if (fe && fv !== null) fe.value = fv;
+    const oe = $('g-other'); if (oe && ov !== null) oe.value = ov;
+  }
+
   // ---- 초기화 ----
   function init() {
     initTabs();
@@ -689,8 +703,12 @@ const App = (() => {
     buildVarCostTable();
     buildFeeSettingTable();
     updateWeekBar();
+    restoreFixedOther();
     recalc();
     applyAvgCogsRates();
+
+    const fe = $('g-fixed'); if (fe) fe.addEventListener('change', saveFixedOther);
+    const oe = $('g-other'); if (oe) oe.addEventListener('change', saveFixedOther);
 
     // 구글 시트 링크 업데이트
     const links = document.querySelectorAll('a[href*="spreadsheets"]');
@@ -706,7 +724,7 @@ const App = (() => {
     saveFeeSettings, applyGoal, applyMapping,
     saveWeek, loadFromSheets,
     aiAnalysis, exportExcel,
-    recalcHours, applyAvgCogsRates,
+    recalcHours, applyAvgCogsRates, saveFixedOther,
   };
 
 })();
