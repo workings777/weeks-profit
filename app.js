@@ -274,16 +274,16 @@ const App = (() => {
       },
     ];
 
-    const hrInput = (val, handler) =>
-      `<input type="number" value="${val ?? ''}" style="width:70px;text-align:right" onchange="${handler}">h`;
+    const hrInput = (id, val) =>
+      `<input type="number" id="${id}" value="${val ?? ''}" style="width:70px;text-align:right">h`;
 
     $('rep-body').innerHTML = rows.map(r => {
       if (r.sep) return '<tr><td colspan="5" style="padding:3px 0;border-bottom:none"></td></tr>';
       if (r.hourRow) return `<tr>
         <td>${r.l}</td>
-        <td>${hrInput(r.gv, 'App.onCgHoursChange(this.value)')}</td>
-        <td>${r.av == null ? '-' : hrInput(r.av, 'App.onActualHoursChange(this.value)')}</td>
-        <td>${hrInput(r.nv, 'App.onNextHoursChange(this.value)')}</td>
+        <td>${hrInput('rep-hours-cg', r.gv)}</td>
+        <td>${r.av == null ? '-' : hrInput('rep-hours-a', r.av)}</td>
+        <td>${hrInput('rep-hours-next', r.nv)}</td>
         <td>-</td>
       </tr>`;
       const cls = (r.cls || '') + (r.ind ? ' ind' : '') + (r.ind2 ? ' ind2' : '');
@@ -555,20 +555,17 @@ const App = (() => {
     alert('금주 목표로 적용 완료!');
   }
 
-  function onCgHoursChange(val) {
-    currentGoal.hours = parseFloat(val) || 0;
+  function recalcHours() {
+    const cgH  = parseFloat($('rep-hours-cg')?.value)   || 0;
+    const aH   = parseFloat($('rep-hours-a')?.value);
+    const nxtH = parseFloat($('rep-hours-next')?.value) || 0;
+
+    currentGoal.hours = cgH;
     localStorage.setItem('currentGoal', JSON.stringify(currentGoal));
-    renderReport();
-    renderGoalSummary();
-  }
 
-  function onActualHoursChange(val) {
-    const el = $('a-hours'); if (el) el.value = val;
-    renderReport();
-  }
+    const aEl = $('a-hours'); if (aEl && !isNaN(aH)) aEl.value = aH;
+    const nEl = $('g-hours'); if (nEl) nEl.value = nxtH;
 
-  function onNextHoursChange(val) {
-    const el = $('g-hours'); if (el) el.value = val;
     renderReport();
     renderGoalSummary();
   }
@@ -631,7 +628,7 @@ const App = (() => {
     saveFeeSettings, applyGoal, applyMapping,
     saveWeek, loadFromSheets,
     aiAnalysis, exportExcel,
-    onCgHoursChange, onActualHoursChange, onNextHoursChange,
+    recalcHours,
   };
 
 })();
