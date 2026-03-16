@@ -11,6 +11,21 @@ const App = (() => {
   const _saved = localStorage.getItem('varRates');
   let varRates = _saved ? JSON.parse(_saved) : JSON.parse(JSON.stringify(CONFIG.VAR_RATES));
 
+  function makeDefaultGoal() {
+    const sales   = CONFIG.CHANNELS.reduce((s, c) => s + CONFIG.CH_DEFAULTS[c][0], 0);
+    const cogs    = CONFIG.CHANNELS.reduce((s, c) => s + CONFIG.CH_DEFAULTS[c][1], 0);
+    const varComm = CONFIG.CHANNELS.reduce((s, c) => s + CONFIG.CH_DEFAULTS[c][0] * (varRates[c]?.commission || 0) / 100, 0);
+    const varLogi = CONFIG.CHANNELS.reduce((s, c) => s + CONFIG.CH_DEFAULTS[c][0] * (varRates[c]?.logistics  || 0) / 100, 0);
+    const varC    = varComm + varLogi;
+    const fixed   = CONFIG.DEFAULT_FIXED;
+    const other   = CONFIG.DEFAULT_OTHER;
+    const hours   = CONFIG.DEFAULT_HOURS;
+    const contrib = sales - cogs - varC;
+    const profit  = contrib - fixed + other;
+    return { sales, cogs, varC, varComm, varLogi, fixed, other, hours, contrib, profit };
+  }
+  let currentGoal = JSON.parse(localStorage.getItem('currentGoal') || 'null') || makeDefaultGoal();
+
   // ---- 유틸 ----
   const fm  = n => Math.round(n).toLocaleString();
   const fmp = (n, d = 1) => isFinite(n) && !isNaN(n) ? n.toFixed(d) + '%' : '-';
@@ -86,7 +101,7 @@ const App = (() => {
     }, 0);
     const fixed  = gv('g-fixed');
     const other  = gv('g-other');
-    const hours  = gv('g-hours');
+    const hours  = gv('a-hours');
     const contrib = sales - cogs - varC;
     const profit  = contrib - fixed + other;
     return { sales, cogs, varC, fixed, other, hours, contrib, profit };
@@ -212,10 +227,11 @@ const App = (() => {
 
   // ---- 보고서 렌더 ----
   function renderReport() {
-    const g = getGoalData();
+    const cg   = currentGoal;       // 금주 목표 (고정)
+    const gNext = getGoalData();    // 익주 목표 (현재 입력값)
     const hasActual = Object.keys(actualData).length > 0;
     const a = hasActual ? getActualData() : null;
-    const gB = g.sales, aB = a?.sales || 1;
+    const gB = cg.sales, aB = a?.sales || 1;
 
     const fmt2 = (v, base, unit) =>
       unit === '원' ? fm(v) + '원' :
@@ -228,30 +244,32 @@ const App = (() => {
       return `<span class="${r >= 100 ? 'pos' : 'neg'}">${fmp(r)}</span>`;
     };
 
+    // 익주목표 변동비 breakdown (nv)
     const varComm = CONFIG.CHANNELS.reduce((s, c) => s + gv(`g-sales-${c}`) * (varRates[c]?.commission || 0) / 100, 0);
     const varLogi = CONFIG.CHANNELS.reduce((s, c) => s + gv(`g-sales-${c}`) * (varRates[c]?.logistics  || 0) / 100, 0);
+    // 금주실적 변동비 breakdown (av)
     const aVarComm = hasActual ? CONFIG.CHANNELS.reduce((s, c) => s + (actualData[c]?.sales || 0) / 1e6 * (varRates[c]?.commission || 0) / 100, 0) : null;
     const aVarLogi = hasActual ? CONFIG.CHANNELS.reduce((s, c) => s + (actualData[c]?.sales || 0) / 1e6 * (varRates[c]?.logistics  || 0) / 100, 0) : null;
 
     const rows = [
-      { l: '매출',           gv: g.sales,   av: a?.sales,   nv: g.sales,   pct: true,  cls: 'hl' },
-      { l: '(-) 매출원가',   gv: g.cogs,    av: a?.cogs,    nv: g.cogs,    pct: true,  ind: true },
-      { l: '(-) 변동비',     gv: g.varC,    av: a?.varC,    nv: g.varC,    pct: true,  ind: true },
-      { l: '    판매수수료', gv: varComm,   av: aVarComm,   nv: varComm,   pct: true,  ind2: true },
-      { l: '    물류비',     gv: varLogi,   av: aVarLogi,   nv: varLogi,   pct: true,  ind2: true },
+      { l: '매출',           gv: cg.sales,        av: a?.sales,   nv: gNext.sales,        pct: true,  cls: 'hl' },
+      { l: '(-) 매출원가',   gv: cg.cogs,         av: a?.cogs,    nv: gNext.cogs,         pct: true,  ind: true },
+      { l: '(-) 변동비',     gv: cg.varC,         av: a?.varC,    nv: gNext.varC,         pct: true,  ind: true },
+      { l: '    판매수수료', gv: cg.varComm ?? 0, av: aVarComm,   nv: varComm,            pct: true,  ind2: true },
+      { l: '    물류비',     gv: cg.varLogi ?? 0, av: aVarLogi,   nv: varLogi,            pct: true,  ind2: true },
       { sep: true },
-      { l: '공헌이익',       gv: g.contrib, av: a?.contrib, nv: g.contrib, pct: true,  cls: 'hl' },
-      { l: '(-) 고정비',     gv: g.fixed,   av: a?.fixed,   nv: g.fixed,   pct: true,  ind: true },
-      { l: '(±) 영업외손익', gv: g.other,   av: a?.other,   nv: g.other,   pct: true,  ind: true },
+      { l: '공헌이익',       gv: cg.contrib,      av: a?.contrib, nv: gNext.contrib,      pct: true,  cls: 'hl' },
+      { l: '(-) 고정비',     gv: cg.fixed,        av: a?.fixed,   nv: gNext.fixed,        pct: true,  ind: true },
+      { l: '(±) 영업외손익', gv: cg.other,        av: a?.other,   nv: gNext.other,        pct: true,  ind: true },
       { sep: true },
-      { l: '채산이익',       gv: g.profit,  av: a?.profit,  nv: g.profit,  pct: true,  cls: 'hl' },
-      { l: '(-) 근무시간',   gv: g.hours,   av: a?.hours,   nv: g.hours,   unit: 'h' },
+      { l: '채산이익',       gv: cg.profit,       av: a?.profit,  nv: gNext.profit,       pct: true,  cls: 'hl' },
+      { l: '(-) 근무시간',   gv: cg.hours,        av: a?.hours,   nv: gNext.hours,        unit: 'h' },
       { sep: true },
       {
         l: '시간당 채산이익',
-        gv: g.hours > 0 ? Math.round(g.profit * 1e6 / g.hours) : 0,
+        gv: cg.hours > 0 ? Math.round(cg.profit * 1e6 / cg.hours) : 0,
         av: a && a.hours > 0 ? Math.round(a.profit * 1e6 / a.hours) : null,
-        nv: g.hours > 0 ? Math.round(g.profit * 1e6 / g.hours) : 0,
+        nv: gNext.hours > 0 ? Math.round(gNext.profit * 1e6 / gNext.hours) : 0,
         unit: '원', cls: 'hl'
       },
     ];
@@ -270,7 +288,7 @@ const App = (() => {
 
     if (hasActual) {
       $('m-sales').textContent = fm(a.sales) + '백만';
-      const gap = a.sales - g.sales;
+      const gap = a.sales - cg.sales;
       $('m-sales-gap').innerHTML = `목표 대비 <span class="${gap >= 0 ? 'pos' : 'neg'}">${gap >= 0 ? '+' : ''}${fm(gap)}백만</span>`;
       $('m-profit').textContent = fm(a.profit) + '백만';
       $('m-profit-rate').textContent = fmp(a.profit / a.sales * 100);
@@ -421,7 +439,7 @@ const App = (() => {
 
   async function saveWeek() {
     const wi = getWeekInfo(weekOffset);
-    const g  = getGoalData();
+    const g  = currentGoal;
     const hasA = Object.keys(actualData).length > 0;
     const a  = hasA ? getActualData() : null;
     const btn = $('save-btn');
@@ -517,7 +535,14 @@ const App = (() => {
 
   // ---- 기타 액션 ----
   function applyGoal() {
-    alert('익주 목표 적용 완료!\n매주 월요일에 금주 목표로 자동 전환됩니다.');
+    const g = getGoalData();
+    const varComm = CONFIG.CHANNELS.reduce((s, c) => s + gv(`g-sales-${c}`) * (varRates[c]?.commission || 0) / 100, 0);
+    const varLogi = CONFIG.CHANNELS.reduce((s, c) => s + gv(`g-sales-${c}`) * (varRates[c]?.logistics  || 0) / 100, 0);
+    currentGoal = { ...g, varComm, varLogi };
+    localStorage.setItem('currentGoal', JSON.stringify(currentGoal));
+    renderReport();
+    renderGoalSummary();
+    alert('금주 목표로 적용 완료!');
   }
 
   function aiAnalysis() {
