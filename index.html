@@ -126,12 +126,12 @@
         <div class="grid-4">
           <div class="field">
             <label>고정비 <span class="field__hint">(직접 입력)</span></label>
-            <input type="number" id="g-fixed" value="391" class="input input--highlight" oninput="App.recalc()">
+            <input type="number" id="g-fixed" value="391" class="input input--highlight" oninput="App.recalc();App.saveFixedOther()">
             <span class="field__unit">백만원</span>
           </div>
           <div class="field">
             <label>영업외손익 <span class="field__hint">(음수 가능)</span></label>
-            <input type="number" id="g-other" value="-53" class="input input--highlight" oninput="App.recalc()">
+            <input type="number" id="g-other" value="-53" class="input input--highlight" oninput="App.recalc();App.saveFixedOther()">
             <span class="field__unit">백만원</span>
           </div>
           <div class="field">
@@ -169,6 +169,30 @@
         </div>
         <input type="file" id="fi" accept=".xlsx,.xls,.csv" style="display:none">
       </div>
+      <div class="btn-row">
+        <button class="btn btn--primary" id="rpa-btn" onclick="runRpa()">백데이터 만들기</button>
+        <span id="rpa-status" style="font-size:13px;color:#888;margin-left:8px"></span>
+      </div>
+      <script>
+        async function runRpa() {
+          const btn = document.getElementById('rpa-btn');
+          const st  = document.getElementById('rpa-status');
+          btn.disabled = true;
+          st.textContent = '실행 중...';
+          try {
+            const res = await fetch('http://localhost:8080/run-rpa', { method: 'POST' });
+            const json = await res.json();
+            if (json.status === 'already_running') {
+              st.textContent = '이미 실행 중입니다.';
+            } else {
+              st.textContent = '실행됨 — ERP 창이 열립니다.';
+            }
+          } catch (e) {
+            st.textContent = 'server.py 를 먼저 실행해주세요 (python server.py)';
+          }
+          btn.disabled = false;
+        }
+      </script>
       <div id="mapping-card" style="display:none">
         <h3 class="section-title">채널 매핑</h3>
         <div class="card">
