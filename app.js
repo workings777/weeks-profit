@@ -8,7 +8,8 @@ const App = (() => {
   let weekOffset = 0;
   let actualData = {};  // { 채널: { sales, cogs } }
   let weeklyData = {};  // { weekKey: { label, goal, actual, saved } }
-  let varRates = JSON.parse(JSON.stringify(CONFIG.VAR_RATES));
+  const _saved = localStorage.getItem('varRates');
+  let varRates = _saved ? JSON.parse(_saved) : JSON.parse(JSON.stringify(CONFIG.VAR_RATES));
 
   // ---- 유틸 ----
   const fm  = n => Math.round(n).toLocaleString();
@@ -325,6 +326,7 @@ const App = (() => {
       const vcrl = $(`vcr-logi-${c}`); if (vcrl) vcrl.value = varRates[c].logistics;
       onFeeSettingChange(c);
     });
+    localStorage.setItem('varRates', JSON.stringify(varRates));
     recalc();
     alert('변동비율 저장 완료!');
   }
