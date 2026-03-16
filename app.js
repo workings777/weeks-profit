@@ -226,13 +226,15 @@ const App = (() => {
 
     const varComm = CONFIG.CHANNELS.reduce((s, c) => s + gv(`g-sales-${c}`) * (varRates[c]?.commission || 0) / 100, 0);
     const varLogi = CONFIG.CHANNELS.reduce((s, c) => s + gv(`g-sales-${c}`) * (varRates[c]?.logistics  || 0) / 100, 0);
+    const aVarComm = hasActual ? CONFIG.CHANNELS.reduce((s, c) => s + (actualData[c]?.sales || 0) / 1e6 * (varRates[c]?.commission || 0) / 100, 0) : null;
+    const aVarLogi = hasActual ? CONFIG.CHANNELS.reduce((s, c) => s + (actualData[c]?.sales || 0) / 1e6 * (varRates[c]?.logistics  || 0) / 100, 0) : null;
 
     const rows = [
       { l: '매출',           gv: g.sales,   av: a?.sales,   nv: g.sales,   pct: true,  cls: 'hl' },
       { l: '(-) 매출원가',   gv: g.cogs,    av: a?.cogs,    nv: g.cogs,    pct: true,  ind: true },
       { l: '(-) 변동비',     gv: g.varC,    av: a?.varC,    nv: g.varC,    pct: true,  ind: true },
-      { l: '    판매수수료', gv: varComm,   av: null,        nv: varComm,   pct: true,  ind2: true },
-      { l: '    물류비',     gv: varLogi,   av: null,        nv: varLogi,   pct: true,  ind2: true },
+      { l: '    판매수수료', gv: varComm,   av: aVarComm,   nv: varComm,   pct: true,  ind2: true },
+      { l: '    물류비',     gv: varLogi,   av: aVarLogi,   nv: varLogi,   pct: true,  ind2: true },
       { sep: true },
       { l: '공헌이익',       gv: g.contrib, av: a?.contrib, nv: g.contrib, pct: true,  cls: 'hl' },
       { l: '(-) 고정비',     gv: g.fixed,   av: a?.fixed,   nv: g.fixed,   pct: true,  ind: true },
