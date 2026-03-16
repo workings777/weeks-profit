@@ -77,6 +77,7 @@
         </div>
       </div>
       <div class="btn-row">
+        <button class="btn btn--primary" onclick="App.recalcHours()">근무시간 재계산</button>
         <button class="btn btn--primary" onclick="App.aiAnalysis()">AI 분석 요청</button>
         <button class="btn" onclick="App.exportExcel()">엑셀 다운로드</button>
         <button class="btn btn--primary" id="save-btn" onclick="App.saveWeek()">구글 시트에 저장</button>
@@ -93,7 +94,10 @@
       </div>
 
       <div class="card card--gap">
-        <div class="card__title">매출원가 — 입고단가×수량 기준 (백만원)</div>
+        <div class="card__title">
+          매출원가 — 입고단가×수량 기준 (백만원)
+          <button class="btn" style="margin-left:8px;font-size:11px;padding:2px 8px" onclick="App.applyAvgCogsRates()">과거 원가율 자동적용</button>
+        </div>
         <div class="grid-4" id="cogs-inputs"></div>
       </div>
 
