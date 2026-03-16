@@ -263,7 +263,7 @@ const App = (() => {
       { l: '(±) 영업외손익', gv: cg.other,        av: a?.other,   nv: gNext.other,        pct: true,  ind: true },
       { sep: true },
       { l: '채산이익',       gv: cg.profit,       av: a?.profit,  nv: gNext.profit,       pct: true,  cls: 'hl' },
-      { l: '(-) 근무시간',   gv: cg.hours,        av: a?.hours,   nv: gNext.hours,        unit: 'h' },
+      { l: '(-) 근무시간', hourRow: true, gv: cg.hours, av: hasActual ? a?.hours : null, nv: gNext.hours },
       { sep: true },
       {
         l: '시간당 채산이익',
@@ -274,8 +274,18 @@ const App = (() => {
       },
     ];
 
+    const hrInput = (val, handler) =>
+      `<input type="number" value="${val ?? ''}" style="width:70px;text-align:right" onchange="${handler}">h`;
+
     $('rep-body').innerHTML = rows.map(r => {
       if (r.sep) return '<tr><td colspan="5" style="padding:3px 0;border-bottom:none"></td></tr>';
+      if (r.hourRow) return `<tr>
+        <td>${r.l}</td>
+        <td>${hrInput(r.gv, 'App.onCgHoursChange(this.value)')}</td>
+        <td>${r.av == null ? '-' : hrInput(r.av, 'App.onActualHoursChange(this.value)')}</td>
+        <td>${hrInput(r.nv, 'App.onNextHoursChange(this.value)')}</td>
+        <td>-</td>
+      </tr>`;
       const cls = (r.cls || '') + (r.ind ? ' ind' : '') + (r.ind2 ? ' ind2' : '');
       return `<tr class="${cls}">
         <td>${r.l}</td>
@@ -545,6 +555,24 @@ const App = (() => {
     alert('금주 목표로 적용 완료!');
   }
 
+  function onCgHoursChange(val) {
+    currentGoal.hours = parseFloat(val) || 0;
+    localStorage.setItem('currentGoal', JSON.stringify(currentGoal));
+    renderReport();
+    renderGoalSummary();
+  }
+
+  function onActualHoursChange(val) {
+    const el = $('a-hours'); if (el) el.value = val;
+    renderReport();
+  }
+
+  function onNextHoursChange(val) {
+    const el = $('g-hours'); if (el) el.value = val;
+    renderReport();
+    renderGoalSummary();
+  }
+
   function aiAnalysis() {
     const g = getGoalData();
     const a = Object.keys(actualData).length > 0 ? getActualData() : null;
@@ -603,6 +631,7 @@ const App = (() => {
     saveFeeSettings, applyGoal, applyMapping,
     saveWeek, loadFromSheets,
     aiAnalysis, exportExcel,
+    onCgHoursChange, onActualHoursChange, onNextHoursChange,
   };
 
 })();
