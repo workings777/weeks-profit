@@ -127,7 +127,7 @@ const App = (() => {
       totC += ca; totL += la; totV += va; totS += s;
       return `<tr>
         <td class="th-left">${tag(c)}</td>
-        <td style="text-align:right">${fm(s)}</td>
+        <td style="text-align:right" id="vc-sales-${c}">${fm(s)}</td>
         <td><input type="number" step="0.1" value="${cr}" id="vcr-comm-${c}" oninput="App.onVarRateChange('${c}')"></td>
         <td style="text-align:right" id="vc-comm-${c}">${fm(ca)}</td>
         <td><input type="number" step="0.1" value="${lr}" id="vcr-logi-${c}" oninput="App.onVarRateChange('${c}')"></td>
@@ -137,7 +137,7 @@ const App = (() => {
     }).join('');
     tbody.innerHTML = rows + `<tr class="total-row">
       <td class="th-left">합계</td>
-      <td style="text-align:right">${fm(totS)}</td>
+      <td style="text-align:right" id="vc-sales-total">${fm(totS)}</td>
       <td></td>
       <td style="text-align:right" id="vc-comm-total">${fm(totC)}</td>
       <td></td>
@@ -159,18 +159,21 @@ const App = (() => {
     const s = gv(`g-sales-${c}`);
     const ca = s * (varRates[c]?.commission || 0) / 100;
     const la = s * (varRates[c]?.logistics  || 0) / 100;
+    const se = $(`vc-sales-${c}`); if (se) se.textContent = fm(s);
     const ce = $(`vc-comm-${c}`); if (ce) ce.textContent = fm(ca);
     const le = $(`vc-logi-${c}`); if (le) le.textContent = fm(la);
     const te = $(`vc-total-${c}`); if (te) te.textContent = fm(ca + la);
   }
 
   function updateVarCostTotals() {
-    let totC = 0, totL = 0;
+    let totC = 0, totL = 0, totS = 0;
     CONFIG.CHANNELS.forEach(c => {
       const s = gv(`g-sales-${c}`);
+      totS += s;
       totC += s * (varRates[c]?.commission || 0) / 100;
       totL += s * (varRates[c]?.logistics  || 0) / 100;
     });
+    const se = $('vc-sales-total'); if (se) se.textContent = fm(totS);
     const ce = $('vc-comm-total'); if (ce) ce.textContent = fm(totC);
     const le = $('vc-logi-total'); if (le) le.textContent = fm(totL);
     const te = $('vc-var-total');  if (te) te.textContent = fm(totC + totL);
