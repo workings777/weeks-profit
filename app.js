@@ -10,6 +10,8 @@ const App = (() => {
   let weeklyData = {};  // { weekKey: { label, goal, actual, saved } }
   const _saved = localStorage.getItem('varRates');
   let varRates = _saved ? JSON.parse(_saved) : JSON.parse(JSON.stringify(CONFIG.VAR_RATES));
+  const _cogsHist = localStorage.getItem('channelCogsHistory');
+  let channelCogsHistory = _cogsHist ? JSON.parse(_cogsHist) : {};  // { 채널: [rate, ...] }
 
   function makeDefaultGoal() {
     const sales   = CONFIG.CHANNELS.reduce((s, c) => s + CONFIG.CH_DEFAULTS[c][0], 0);
@@ -115,8 +117,11 @@ const App = (() => {
       let html = '';
       CONFIG.CHANNELS.forEach(c => {
         const def = CONFIG.CH_DEFAULTS[c][type === 'sales' ? 0 : 1];
+        const hint = type === 'cogs'
+          ? `<span class="field__hint" id="g-cogs-hint-${c}" style="font-size:11px;color:#888"></span>`
+          : '';
         html += `<div class="field">
-          <label>${tag(c)}</label>
+          <label>${tag(c)}${hint}</label>
           <input type="number" id="g-${type}-${c}" value="${def}" class="input" oninput="App.recalc()">
           <span class="field__unit">백만원</span>
         </div>`;
@@ -436,9 +441,41 @@ const App = (() => {
       <td>${totN}건</td>
     </tr>`;
 
+    // 채널별 원가율 기록
+    CONFIG.CHANNELS.forEach(c => {
+      const d = actualData[c];
+      if (d.sales > 0) {
+        if (!channelCogsHistory[c]) channelCogsHistory[c] = [];
+        channelCogsHistory[c].push(d.cogs / d.sales);
+        if (channelCogsHistory[c].length > 12) channelCogsHistory[c].shift();
+      }
+    });
+    localStorage.setItem('channelCogsHistory', JSON.stringify(channelCogsHistory));
+    applyAvgCogsRates();
+
     $('agg-result').style.display = 'block';
     renderReport();
     alert('실적이 반영되었습니다! 주간 보고서 탭에서 확인하세요.');
+  }
+
+  // ---- 채널 평균 원가율 자동계산 ----
+  function applyAvgCogsRates() {
+    let applied = false;
+    CONFIG.CHANNELS.forEach(c => {
+      const hist = channelCogsHistory[c];
+      if (!hist || hist.length === 0) return;
+      const avgRate = hist.reduce((s, v) => s + v, 0) / hist.length;
+      const salesEl = $(`g-sales-${c}`);
+      const cogsEl  = $(`g-cogs-${c}`);
+      if (salesEl && cogsEl) {
+        cogsEl.value = Math.round(parseFloat(salesEl.value || 0) * avgRate);
+        applied = true;
+      }
+      // hint 업데이트
+      const hintEl = $(`g-cogs-hint-${c}`);
+      if (hintEl) hintEl.textContent = `평균 ${fmp(avgRate * 100)} (${hist.length}주)`;
+    });
+    if (applied) recalc();
   }
 
   // ---- 구글 시트 연동 ----
@@ -511,6 +548,7 @@ const App = (() => {
           };
         });
         renderHistory();
+        applyAvgCogsRates();
         setSyncStatus('ok', `${json.data.length}개 주차 불러옴`);
       } else {
         setSyncStatus('err', '불러오기 실패');
@@ -581,7 +619,46 @@ const App = (() => {
   }
 
   function exportExcel() {
-    alert('엑셀 내보내기는 추후 구현 예정입니다.\n현재는 구글 시트에서 다운로드해주세요.');
+    const cg    = currentGoal;
+    const gNext = getGoalData();
+    const hasA  = Object.keys(actualData).length > 0;
+    const a     = hasA ? getActualData() : null;
+
+    const wiCur  = getWeekInfo(weekOffset);
+    const wiNext = getWeekInfo(weekOffset + 1);
+
+    const fmn  = n => Math.round(n).toLocaleString();
+    const fpct = (val, base) => base > 0 ? `${fmn(val)}(${(val / base * 100).toFixed(1)}%)` : fmn(val);
+    const av   = (val, base) => val != null ? fpct(val, base) : '-';
+
+    const cgB = cg.sales, aB = a?.sales || 1, nB = gNext.sales;
+    const cgH = cg.hours > 0 ? Math.round(cg.profit * 1e6 / cg.hours) : 0;
+    const aH  = a && a.hours > 0 ? Math.round(a.profit * 1e6 / a.hours) : null;
+    const nH  = gNext.hours > 0 ? Math.round(gNext.profit * 1e6 / gNext.hours) : 0;
+
+    const rows = [
+      [`BEP 시간당 채산이익 : ${CONFIG.BEP_HOURLY.toLocaleString()}원`, `${wiCur.label} 목표`, `${wiCur.label} 실적`, `${wiNext.label} 목표`, '목표 대비 실적에 대한 분석 / 금주 목표를 달성하기 위한 계획'],
+      ['시간당채산이익(원)', fmn(cgH), aH != null ? fmn(aH) : '-', fmn(nH), ''],
+      ['', '', '', '', ''],
+      ['매출',              fpct(cg.sales,   cgB), av(a?.sales,   aB), fpct(gNext.sales,   nB), ''],
+      ['(-) 매출원가',      fpct(cg.cogs,    cgB), av(a?.cogs,    aB), fpct(gNext.cogs,    nB), ''],
+      ['(-) 변동비(원가외)', fpct(cg.varC,   cgB), av(a?.varC,    aB), fpct(gNext.varC,    nB), ''],
+      ['', '', '', '', ''],
+      ['공헌이익',          fpct(cg.contrib, cgB), av(a?.contrib, aB), fpct(gNext.contrib, nB), ''],
+      ['(-) 고정비',        fpct(cg.fixed,   cgB), av(a?.fixed,   aB), fpct(gNext.fixed,   nB), ''],
+      ['(±) 영업외손익',    fpct(cg.other,   cgB), av(a?.other,   aB), fpct(gNext.other,   nB), ''],
+      ['', '', '', '', ''],
+      ['채산이익',          fpct(cg.profit,  cgB), av(a?.profit,  aB), fpct(gNext.profit,  nB), ''],
+      ['(+) 근무시간(시간)', fmn(cg.hours), a ? fmn(a.hours) : '-', fmn(gNext.hours), ''],
+      ['', '', '', '', ''],
+      ['(=) 시간당채산이익(원)', fmn(cgH), aH != null ? fmn(aH) : '-', fmn(nH), ''],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 20 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 50 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '주간보고서');
+    XLSX.writeFile(wb, `주간보고서_${wiCur.key}.xlsx`);
   }
 
   // ---- 탭 전환 ----
@@ -613,6 +690,7 @@ const App = (() => {
     buildFeeSettingTable();
     updateWeekBar();
     recalc();
+    applyAvgCogsRates();
 
     // 구글 시트 링크 업데이트
     const links = document.querySelectorAll('a[href*="spreadsheets"]');
@@ -628,7 +706,7 @@ const App = (() => {
     saveFeeSettings, applyGoal, applyMapping,
     saveWeek, loadFromSheets,
     aiAnalysis, exportExcel,
-    recalcHours,
+    recalcHours, applyAvgCogsRates,
   };
 
 })();
