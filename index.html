@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>주간 시간당 채산이익 보고서</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- 탭 -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="report">주간 보고서</button>
+      <button class="tab" data-tab="input">목표 입력</button>
+      <button class="tab" data-tab="upload">실적 업로드</button>
+      <button class="tab" data-tab="fees">변동비 설정</button>
+      <button class="tab" data-tab="history">과거 주차</button>
+    </nav>
+
+    <!-- 주차 바 -->
+    <div class="week-bar">
+      <div>
+        <div class="week-bar__sub">현재 주차</div>
+        <div class="week-bar__label" id="wk-label">-</div>
+      </div>
+      <span class="badge" id="wk-badge">금주</span>
+      <div class="week-bar__right">
+        <div class="sync-status">
+          <div class="sync-dot" id="sync-dot"></div>
+          <span id="sync-text">-</span>
+        </div>
+        <div class="week-nav">
+          <button class="btn" onclick="ofw(-1)">◀ 전주</button>
+          <button class="btn btn--bold" onclick="ofw(0)">이번 주</button>
+          <button class="btn" onclick="ofw(1)">익주 ▶</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 보고서 탭 ===== -->
+    <section class="section active" id="tab-report">
+      <div class="metric-grid">
+        <div class="metric"><div class="metric__label">BEP 시간당 채산이익</div><div class="metric__value">40,294원</div></div>
+        <div class="metric"><div class="metric__label">실적 매출</div><div class="metric__value" id="m-sales">-</div><div class="metric__sub" id="m-sales-gap">파일 업로드 후 표시</div></div>
+        <div class="metric"><div class="metric__label">실적 채산이익</div><div class="metric__value" id="m-profit">-</div><div class="metric__sub" id="m-profit-rate">-</div></div>
+        <div class="metric"><div class="metric__label">시간당 채산이익</div><div class="metric__value" id="m-hourly">-</div></div>
+      </div>
+      <div class="card">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th class="th-left">항목</th>
+              <th>금주 목표</th>
+              <th>금주 실적</th>
+              <th>익주 목표</th>
+              <th>달성률</th>
+            </tr>
+          </thead>
+          <tbody id="rep-body"></tbody>
+        </table>
+      </div>
+      <div id="channel-breakdown" style="display:none">
+        <h3 class="section-title">채널별 실적</h3>
+        <div class="card">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th class="th-left">채널</th>
+                <th>매출</th>
+                <th>매출원가 (입고단가×수량)</th>
+                <th>원가율</th>
+              </tr>
+            </thead>
+            <tbody id="ch-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn--primary" onclick="App.recalcHours()">근무시간 재계산</button>
+        <button class="btn btn--primary" onclick="App.aiAnalysis()">AI 분석 요청</button>
+        <button class="btn" onclick="App.exportExcel()">엑셀 다운로드</button>
+        <button class="btn btn--primary" id="save-btn" onclick="App.saveWeek()">구글 시트에 저장</button>
+      </div>
+    </section>
+
+    <!-- ===== 목표 입력 탭 ===== -->
+    <section class="section" id="tab-input">
+      <h2 class="section-title">익주 목표 입력</h2>
+
+      <div class="card card--gap">
+        <div class="card__title">매출 (백만원)</div>
+        <div class="grid-4" id="sales-inputs"></div>
+      </div>
+
+      <div class="card card--gap">
+        <div class="card__title">
+          매출원가 — 입고단가×수량 기준 (백만원)
+          <button class="btn" style="margin-left:8px;font-size:11px;padding:2px 8px" onclick="App.applyAvgCogsRates()">과거 원가율 자동적용</button>
+        </div>
+        <div class="grid-4" id="cogs-inputs"></div>
+      </div>
+
+      <div class="card card--gap">
+        <div class="card__title">변동비 예측 — 채널별 판매수수료 + 물류비율 자동계산</div>
+        <div class="table-scroll">
+          <table class="var-table">
+            <thead>
+              <tr>
+                <th class="th-left">채널</th>
+                <th>매출</th>
+                <th>판매수수료율 (%)</th>
+                <th>판매수수료 (백만)</th>
+                <th>물류비율 (%)</th>
+                <th>물류비 (백만)</th>
+                <th>변동비 합계 (백만)</th>
+              </tr>
+            </thead>
+            <tbody id="varCost-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card card--gap">
+        <div class="card__title">고정비 / 영업외손익 / 근무시간</div>
+        <div class="grid-4">
+          <div class="field">
+            <label>고정비 <span class="field__hint">(직접 입력)</span></label>
+            <input type="number" id="g-fixed" value="391" class="input input--highlight" oninput="App.recalc();App.saveFixedOther()">
+            <span class="field__unit">백만원</span>
+          </div>
+          <div class="field">
+            <label>영업외손익 <span class="field__hint">(음수 가능)</span></label>
+            <input type="number" id="g-other" value="-53" class="input input--highlight" oninput="App.recalc();App.saveFixedOther()">
+            <span class="field__unit">백만원</span>
+          </div>
+          <div class="field">
+            <label>익주 근무시간</label>
+            <input type="number" id="g-hours" value="2735" class="input" oninput="App.recalc()">
+            <span class="field__unit">시간</span>
+          </div>
+          <div class="field">
+            <label>실적 근무시간</label>
+            <input type="number" id="a-hours" value="2735" class="input input--highlight" oninput="App.recalc()">
+            <span class="field__unit">시간</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn--primary" onclick="App.applyGoal()">익주 목표 적용</button>
+      </div>
+
+      <div style="margin-top:1.5rem">
+        <h3 class="section-title" style="font-size:13px">익주 목표 요약</h3>
+        <div class="metric-grid" id="goal-summary"></div>
+      </div>
+    </section>
+
+    <!-- ===== 실적 업로드 탭 ===== -->
+    <section class="section" id="tab-upload">
+      <h2 class="section-title">실적 데이터 업로드</h2>
+      <div class="info-box info-box--blue">
+        매출원가 = <strong>입고단가 × 수량</strong> (컬럼: <code>ingoga x qty</code>)
+      </div>
+      <div class="card">
+        <div class="upload-zone" onclick="document.getElementById('fi').click()">
+          엑셀 파일 클릭하여 업로드 (.xlsx / .xls / .csv)
+        </div>
+        <input type="file" id="fi" accept=".xlsx,.xls,.csv" style="display:none">
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--secondary" href="start.zip" download="실행.bat.zip">실행.bat 다운로드</a>
+        <button class="btn btn--primary" id="rpa-btn" onclick="runRpa()">백데이터 만들기</button>
+        <span id="rpa-status" style="font-size:13px;color:#888;margin-left:8px"></span>
+      </div>
+      <script>
+        async function runRpa() {
+          const btn = document.getElementById('rpa-btn');
+          const st  = document.getElementById('rpa-status');
+          btn.disabled = true;
+          st.textContent = '실행 중...';
+          try {
+            const res = await fetch('http://localhost:8080/run-rpa', { method: 'POST' });
+            const json = await res.json();
+            if (json.status === 'already_running') {
+              st.textContent = '이미 실행 중입니다.';
+            } else {
+              st.textContent = '실행됨 — ERP 창이 열립니다.';
+            }
+          } catch (e) {
+            st.textContent = '실행.bat 을 먼저 실행해주세요';
+          }
+          btn.disabled = false;
+        }
+      </script>
+      <div id="mapping-card" style="display:none">
+        <h3 class="section-title">채널 매핑</h3>
+        <div class="card">
+          <div id="map-rows"></div>
+          <div class="btn-row">
+            <button class="btn btn--primary" onclick="App.applyMapping()">매핑 적용 및 실적 집계</button>
+          </div>
+        </div>
+      </div>
+      <div id="agg-result" style="display:none">
+        <h3 class="section-title">채널별 집계 결과</h3>
+        <div class="card">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th class="th-left">채널</th>
+                <th>매출</th>
+                <th>매출원가</th>
+                <th>원가율</th>
+                <th>건수</th>
+              </tr>
+            </thead>
+            <tbody id="agg-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 변동비 설정 탭 ===== -->
+    <section class="section" id="tab-fees">
+      <h2 class="section-title">채널별 변동비율 설정</h2>
+      <div class="info-box info-box--blue">여기서 설정한 비율이 목표 입력 탭의 변동비 자동계산에 반영됩니다.</div>
+      <div class="card">
+        <table class="var-table">
+          <thead>
+            <tr>
+              <th class="th-left">채널</th>
+              <th>판매수수료율 (%)</th>
+              <th>물류비율 (%)</th>
+              <th>합계율 (%)</th>
+            </tr>
+          </thead>
+          <tbody id="fee-setting-body"></tbody>
+        </table>
+        <div class="btn-row">
+          <button class="btn btn--primary" onclick="App.saveFeeSettings()">저장 및 적용</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 과거 주차 탭 ===== -->
+    <section class="section" id="tab-history">
+      <h2 class="section-title">과거 주차 기록</h2>
+      <div class="info-box info-box--green">
+        구글 시트에서도 확인:
+        <a href="https://docs.google.com/spreadsheets/d/1gwxAe3RMLaa1rROeWSk0yBAnxdumAkh6J-du65zzcoI" target="_blank">시트 열기</a>
+      </div>
+      <div class="btn-row" style="margin-bottom:1rem">
+        <button class="btn" onclick="App.loadFromSheets()">구글 시트에서 불러오기</button>
+      </div>
+      <div id="hist-list">
+        <p class="empty-msg">저장된 데이터가 없습니다.</p>
+      </div>
+    </section>
+
+  </div><!-- /.app -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
